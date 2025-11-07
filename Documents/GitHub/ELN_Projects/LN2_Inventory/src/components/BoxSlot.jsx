@@ -2,6 +2,12 @@ import React from 'react';
 import { useDrop } from 'react-dnd';
 import Vial, { ItemTypes } from './Vial'; // Import ItemTypes from Vial.jsx
 
+// Helper function to check if content is a valid, non-empty vial object
+const isValidVial = (content) => {
+    // Must be non-null, an object, and have at least one key (data)
+    return content && typeof content === 'object' && Object.keys(content).length > 0;
+};
+
 export default function BoxSlot({ 
     row, 
     col, 
@@ -17,7 +23,7 @@ export default function BoxSlot({
         accept: [ItemTypes.VIAL, ItemTypes.VIAL_BATCH],
         drop: (item, monitor) => {
             // Only handle drop if the slot is empty
-            if (content === null) {
+            if (!isValidVial(content)) { // Use the robust check here too
                 onDropVial(item, monitor.getItemType());
                 
                 // Return coordinates for the Vial.jsx cleanup logic
@@ -25,7 +31,7 @@ export default function BoxSlot({
             }
             return undefined;
         },
-        canDrop: (item, monitor) => content === null, // Only allow drop if the slot is empty
+        canDrop: (item, monitor) => !isValidVial(content), // Only allow drop if the slot is empty
         collect: (monitor) => ({
             isOver: monitor.isOver(),
             canDrop: monitor.canDrop(),
@@ -52,9 +58,12 @@ export default function BoxSlot({
 
     const dragRef = drop;
 
+    // Check if the slot should display a vial
+    const shouldDisplayVial = isValidVial(content);
+
     return (
         <div ref={dragRef} style={slotStyle} title={`Slot ${row}${col}`}>
-            {content && (
+            {shouldDisplayVial && (
                 <Vial 
                     vialData={content} 
                     isPlaced={true} 
@@ -63,8 +72,7 @@ export default function BoxSlot({
                     currentCoords={currentCoords}
                 />
             )}
-            {/* Display status for debugging/UX */}
-            {!content && isOver && canDrop && (
+            {!shouldDisplayVial && isOver && canDrop && (
                 <span style={{ fontSize: '0.6rem', color: '#3b82f6' }}>Drop Here</span>
             )}
         </div>

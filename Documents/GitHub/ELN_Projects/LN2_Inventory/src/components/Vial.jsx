@@ -1,6 +1,6 @@
 // Vial.jsx
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { FaMicroscope, FaTimes } from 'react-icons/fa'; 
 
@@ -16,16 +16,16 @@ export { ItemTypes };
 // Styling for the hover tooltip (defined outside for clarity and performance)
 const tooltipStyle = {
     position: 'absolute',
-    left: '100%', // Position next to the disc
+    left: '100%', 
     top: '50%',
-    transform: 'translate(10px, -50%)', // Move slightly to the right and vertically center
+    transform: 'translate(10px, -50%)', 
     zIndex: 10,
-    backgroundColor: '#334155', // Slate gray background
+    backgroundColor: '#334155', 
     color: 'white',
     padding: '8px 12px',
     borderRadius: '6px',
-    minWidth: '180px', // Increased width to accommodate more data
-    pointerEvents: 'none', // Critical: prevents the tooltip from blocking the mouse
+    minWidth: '180px', 
+    pointerEvents: 'none', 
     boxShadow: '0 4px 10px rgba(0, 0, 0, 0.3)',
 };
 
@@ -33,13 +33,11 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     
   // State to control the visibility of the tooltip
   const [isHovered, setIsHovered] = useState(false);
-  
-  // Create a local ref to hold the DOM element
-  const domRef = useRef(null);
 
   // Helper to format the date
   const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
+    // Guard against missing vialData or date string
+    if (!vialData || !dateString) return 'N/A'; 
     try {
         return new Date(dateString).toLocaleDateString();
     } catch (e) {
@@ -47,13 +45,13 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     }
   };
 
-  // 1. Setup Drag Hook
-  // Get the 'preview' function from useDrag
-  const [{ isDragging }, drag, preview] = useDrag(() => ({
+  // 1. Setup Drag Hook 
+  const [{ isDragging }, drag] = useDrag(() => ({
     type: ItemTypes.VIAL,
-    item: vialData, 
+    // Safely use an empty object if vialData is undefined during lifecycle cleanup
+    item: vialData || {}, 
     
-    // Logic to clear source slot only after a successful drop (prevents immediate disappearance)
+    // Logic to clear source slot only after a successful drop
     end: (item, monitor) => {
         const dropResult = monitor.getDropResult();
         if (dropResult?.row && dropResult?.col) {
@@ -68,20 +66,9 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     }),
   }), [vialData, isPlaced, onDragClear, currentCoords]); 
   
-  // 2. Use effect to manually assign the drag preview with a fixed offset
-  useEffect(() => {
-    if (isPlaced && domRef.current) {
-        // Force the drag preview to be ONLY the current DOM element (40x40 circle)
-        // Offset by 20px (half of 40px) to center the cursor exactly over the circle, 
-        // which prevents the ghosting of neighboring elements.
-        preview(domRef.current, { offsetX: 20, offsetY: 20 });
-    }
-    // FIX: Include domRef.current and preview in dependencies for reliability
-  }, [isPlaced, domRef.current, preview]);
-
-  // 3. Conditional Styling (No change here)
+  // 2. Conditional Styling
   const style = {
-    // GUARANTEED FIX for circular shape
+    // Styling for circular shape (FIXED)
     width: isPlaced ? '80%' : 'auto', 
     height: isPlaced ? 'auto' : 'auto', 
     aspectRatio: isPlaced ? '1/1' : 'auto', 
@@ -94,26 +81,26 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     backgroundColor: isPlaced ? '#10b981' : '#2563eb', 
     color: 'white',
     cursor: 'move',
-    opacity: isDragging ? 0.01 : 1, 
+    // Drag visibility fix: make it semi-transparent
+    opacity: isDragging ? 0.4 : 1, 
     
+    // Drag visibility fix: Ensure it's on top
+    zIndex: isDragging ? 100 : 1,
+
     display: 'flex',
     alignItems: 'center',
     justifyContent: isPlaced ? 'center' : 'flex-start',
     fontSize: isPlaced ? '0.6rem' : '0.8rem',
     fontWeight: 'bold',
-    position: 'relative', // CRITICAL: Tooltip uses this as reference
-    boxShadow: isPlaced ? 'none' : '0 1px 3px rgba(0,0,0,0.2)',
+    position: 'relative', 
+    boxShadow: 'none', 
   };
   
-  // 4. Assign both the drag function and the local ref to the DOM element
-  const combinedRef = (el) => {
-      drag(el); // Assign to react-dnd drag source
-      domRef.current = el; // Store reference for manual preview
-  };
+  const dragRef = drag;
 
   return (
     <div 
-        ref={combinedRef} // Use the combined ref
+        ref={dragRef} 
         style={style}
         // ADD HOVER HANDLERS HERE
         onMouseEnter={() => setIsHovered(true)}
@@ -122,34 +109,35 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
       
       {isPlaced ? (
         <>
+            {/* Use optional chaining everywhere for stability */}
             {/* Show only a small identifier when placed */}
-            {vialData.experimentName ? vialData.experimentName.substring(0, 3).toUpperCase() : 'V'}
+            {vialData?.experimentName ? vialData.experimentName.substring(0, 3).toUpperCase() : 'V'}
             
             {/* CONDITIONAL TOOLTIP RENDER */}
             {isHovered && (
                 <div style={tooltipStyle}>
                     <p style={{ margin: 0, fontWeight: 'bold', fontSize: '0.8rem' }}>
-                        {vialData.experimentName || 'Unnamed Vial'}
+                        {vialData?.experimentName || 'Unnamed Vial'}
                     </p>
                     <hr style={{ margin: '4px 0', borderColor: '#475569' }}/>
                     
                     {/* Species and Cell Type */}
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Species:** {vialData.species || 'N/A'}
+                        **Species:** {vialData?.species || 'N/A'}
                     </p>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Cell Type:** {vialData.cellType || 'N/A'}
+                        **Cell Type:** {vialData?.cellType || 'N/A'}
                     </p>
 
                     {/* NEW FIELDS ADDED HERE */}
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Frozen:** {formatDate(vialData.freezeDate)}
+                        **Frozen:** {formatDate(vialData?.freezeDate)}
                     </p>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Conc.:** {vialData.concentration || 'N/A'}
+                        **Conc.:** {vialData?.concentration || 'N/A'}
                     </p>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Owner:** {vialData.owner || 'N/A'}
+                        **Owner:** {vialData?.owner || 'N/A'}
                     </p>
                 </div>
             )}
@@ -165,15 +153,15 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
                     position: 'absolute',
                     top: -1,
                     right: -1,
-                    // THE FIX: Darker red background with some transparency
-                    background: 'rgba(220, 38, 38, 0.7)', // Slightly transparent dark red
+                    // Visible dark red background fix
+                    background: 'rgba(220, 38, 38, 0.7)', 
                     border: 'none', 
                     color: 'white', 
                     cursor: 'pointer',
                     fontSize: '0.6rem',
                     padding: 0,
                     lineHeight: '10px',
-                    borderRadius: '9999px', // Keep button round
+                    borderRadius: '9999px', 
                     width: '12px',
                     height: '12px',
                   }}
@@ -187,7 +175,7 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
         <>
             {/* Full content for unplaced vials */}
             <FaMicroscope style={{ marginRight: 5 }} />
-            {vialData.experimentName || 'Unnamed Vial'}
+            {vialData?.experimentName || 'Unnamed Vial'}
         </>
       )}
     </div>

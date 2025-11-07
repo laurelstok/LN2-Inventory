@@ -95,7 +95,16 @@ export default function App() {
     setCurrentBoxLocation({ tower: null, slot: null });
   };
   
-  const onAddNewVial = (vialBatchData) => { /* ... batch creation logic ... */ };
+  const onAddNewVial = (vialBatchData) => {
+    setUnplacedVials((prev) => [
+      ...prev,
+      ...Array.from({ length: Number(vialBatchData.quantity) }, (_, i) => ({
+        ...vialBatchData,
+        id: Date.now() + i, // Unique ID for each vial
+        quantity: undefined // Each object represents a single vial
+      }))
+    ]);
+  };
   
   // ⭐ FINAL FIX: Box movement handler (now handles unplaced-to-tower reliably)
   const moveBox = useCallback((source, destination) => {
