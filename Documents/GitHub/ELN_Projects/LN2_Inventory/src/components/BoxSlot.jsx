@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react'; // <-- FIX: MUST IMPORT useState
 import { useDrop } from 'react-dnd';
 import Vial, { ItemTypes } from './Vial'; // Import ItemTypes from Vial.jsx
 
@@ -18,6 +18,9 @@ export default function BoxSlot({
     currentCoords 
 }) {
     
+    // ⭐ FIX 1: Add state to track hover for z-index elevation
+    const [isHovered, setIsHovered] = useState(false);
+
     // 1. Setup Drop Hook
     const [{ isOver, canDrop }, drop] = useDrop(() => ({
         accept: [ItemTypes.VIAL, ItemTypes.VIAL_BATCH],
@@ -46,10 +49,14 @@ export default function BoxSlot({
         backgroundColor: '#f1f5f9', // Light gray background
         position: 'relative',
         
-        // ⭐ THE FIX: Use Flexbox to perfectly center the circular Vial
+        // Use Flexbox to perfectly center the circular Vial
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center', 
+        
+        // ⭐ FIX 2: Elevate the zIndex of the entire slot when its content is hovered.
+        // This ensures the Vial's absolute-positioned tooltip floats over adjacent slots.
+        zIndex: isHovered ? 150 : 1, 
         
         // Drop highlight
         boxShadow: isOver && canDrop ? '0 0 5px 3px #3b82f6' : 'none', 
@@ -62,7 +69,14 @@ export default function BoxSlot({
     const shouldDisplayVial = isValidVial(content);
 
     return (
-        <div ref={dragRef} style={slotStyle} title={`Slot ${row}${col}`}>
+        <div 
+            ref={dragRef} 
+            style={slotStyle} 
+            title={`Slot ${row}${col}`}
+            // ⭐ FIX 3: Add hover handlers to the entire slot
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+        >
             {shouldDisplayVial && (
                 <Vial 
                     vialData={content} 

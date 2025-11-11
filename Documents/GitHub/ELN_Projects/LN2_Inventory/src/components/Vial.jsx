@@ -1,5 +1,3 @@
-// Vial.jsx
-
 import React, { useState } from 'react';
 import { useDrag } from 'react-dnd';
 import { FaMicroscope, FaTimes } from 'react-icons/fa'; 
@@ -19,7 +17,8 @@ const tooltipStyle = {
     left: '100%', 
     top: '50%',
     transform: 'translate(10px, -50%)', 
-    zIndex: 10,
+    // ⭐ FIX: isDragging is not defined here. Use a static high zIndex.
+    zIndex: 100, 
     backgroundColor: '#334155', 
     color: 'white',
     padding: '8px 12px',
@@ -85,6 +84,7 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     opacity: isDragging ? 0.4 : 1, 
     
     // Drag visibility fix: Ensure it's on top
+    // NOTE: The BoxSlot component should handle the zIndex elevation on hover (isHovered)
     zIndex: isDragging ? 100 : 1,
 
     display: 'flex',

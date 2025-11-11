@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrash, FaPlus, FaBox, FaVial, FaInfoCircle, FaTimes } from "react-icons/fa";
 import VialForm from "./VialForm"; 
 
+
 export default function TabbedManagementForm({
   editingTarget,
   isEditingContents,
@@ -62,10 +63,19 @@ export default function TabbedManagementForm({
         setFormState({ label: "", dimensions: "9x9" });
     };
     
+    const [vialFormKey, setVialFormKey] = useState(0); // Add a key state
+
     // Handler for Vial Form submission
     const handleVialSubmit = (vialData, isUpdate) => {
         if (!isUpdate) {
-            onAddNewVial(vialData);
+          // 1. Cal the global handler to add the new batch
+            onAddNewVial((vialData));
+          // 2. Increment the key to force the VialForm component to remount
+          // This effectively resets its internal state for the next batch.
+          setVialFormKey(prev => prev + 1);
+
+          // You may also want to switch tabs back to 'add' or show a success message
+          // setActiveTab("add");
         }
     };
 
@@ -215,7 +225,7 @@ export default function TabbedManagementForm({
             
             {activeTab === "add" && renderAddBoxForm()}
 
-            {activeTab === "vial" && <VialForm onSubmitVial={handleVialSubmit} />} 
+            {activeTab === "vial" && <VialForm key={vialFormKey}onSubmitVial={handleVialSubmit} />} 
 
             {activeTab === "edit" && (
                 boxSelected ? renderSelectedBoxActions() : (

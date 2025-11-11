@@ -59,7 +59,7 @@ export default function App() {
   });
 
   const [unplacedBoxes, setUnplacedBoxes] = useState([]);
-  const [unplacedVials, setUnplacedVials] = useState(INITIAL_UNPLACED_VIALS); 
+  const [unplacedVials, setUnplacedVials] = useState([]); 
   
   const [currentBoxLocation, setCurrentBoxLocation] = useState({
     tower: 1,
@@ -95,15 +95,26 @@ export default function App() {
     setCurrentBoxLocation({ tower: null, slot: null });
   };
   
-  const onAddNewVial = (vialBatchData) => {
-    setUnplacedVials((prev) => [
-      ...prev,
-      ...Array.from({ length: Number(vialBatchData.quantity) }, (_, i) => ({
-        ...vialBatchData,
-        id: Date.now() + i, // Unique ID for each vial
-        quantity: undefined // Each object represents a single vial
-      }))
-    ]);
+  const handleAddNewVial = (vialBatchData) => {
+    const { quantity, ...metadata } = vialBatchData;
+    const newVials = [];
+    const uniqueBatchId = uuidv4(); // Unique batch ID for this batch of vials
+    for (let i = 0; i < quantity; i++) {
+      const newVial = {
+        // CRITICAL: generate a unique ID for each vial
+        id: uuidv4(),
+        ...metadata,
+        // You may want to add a batch number/index here
+        batchIndex: i + 1
+      };
+      newVials.push(newVial);
+    }
+    //1. Immediately update the unplacedVialse state
+    setUnplacedVials(prevVials => [...prevVials, ...newVials]);
+    // 2. Clear the selection if a box was active, forcing a UI refresh
+    // This is optional but can sometimes shake loose rendering issues
+    // onClearSelection();
+    console.log(`Successfully added ${newVials.length} new vials.`);
   };
   
   // ⭐ FINAL FIX: Box movement handler (now handles unplaced-to-tower reliably)
@@ -316,7 +327,7 @@ export default function App() {
             onSubmit={onUpdateBoxMetadata}
             onClearSelection={onClearSelection}
             onAddNewBox={addNewBox}
-            onAddNewVial={onAddNewVial}
+            onAddNewVial={handleAddNewVial}
             moveToUnplaced={moveToUnplaced}
             showDeleteConfirm={showDeleteConfirm}
             onAddTower={onAddTower} 
@@ -325,15 +336,16 @@ export default function App() {
           />
           
           {/* 2. DYNAMIC UNPLACED LISTS */}
-          {isEditingContents ? (
-              // If editing contents, show unplaced vials
-              <UnplacedVials 
-                  unplacedVials={unplacedVials} 
-              />
-          ) : (
-              // Otherwise, show unplaced boxes
-              <UnplacedList unplacedBoxes={unplacedBoxes} onSelectBox={onSelectBox} />
+          {!isEditingContents && (
+            <UnplacedList unplacedBoxes={unplacedBoxes} onSelectBox={onSelectBox} />  
           )}
+
+          {/*3. UNPLACED VIALS (Always visible, or visible when editing content)*/}
+          {/* For now, let's show it only when editing contents OR if you want it always visible: */}
+          <UnplacedVials
+            unplacedVials={unplacedVials}
+            style={{ borderTop: '1px solid #ccc', paddingTTop: 10 }}
+          />
         </div>
 
         {/* ------------------------------------------------------ */}
