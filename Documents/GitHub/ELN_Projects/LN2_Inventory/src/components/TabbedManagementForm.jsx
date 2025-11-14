@@ -38,6 +38,8 @@ export default function TabbedManagementForm({
     const isBoxSelected = editingTarget?.type === 'box' && editingTarget.data;
     const isVialSelected = editingTarget?.type === 'vial' && editingTarget.data;
     const isVialBatchSelected = editingTarget?.type === 'vial_batch' && editingTarget.data;
+    const isVialMultiSelected = editingTarget?.type === 'vial_multi';
+
 
     
     // --- EFFECTS ---
@@ -64,6 +66,9 @@ export default function TabbedManagementForm({
   } else if (isVialBatchSelected) {
       setActiveTab("vial");
       setVialFormState(editingTarget.data.vials?.[0] || {}); // first vial as template
+  } else if (isVialBatchSelected) {
+        setActiveTab("vial");
+        setVialFormState(editingTarget.data.vials[0]);
   } else if (activeTab === "edit" || activeTab === "vial") {
       setActiveTab("add");
       setFormState({ label: "", dimensions: "9x9" });

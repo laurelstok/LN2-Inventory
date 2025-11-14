@@ -1,10 +1,9 @@
-import React, { useState } from 'react'; // <-- FIX: MUST IMPORT useState
+import React, { useState } from 'react';
 import { useDrop } from 'react-dnd';
-import Vial, { ItemTypes } from './Vial'; // Import ItemTypes from Vial.jsx
+import Vial, { ItemTypes } from './Vial';
 
-// Helper function to check if content is a valid, non-empty vial object
+// Helper: check if content is a valid vial object
 const isValidVial = (content) => {
-    // Must be non-null, an object, and have at least one key (data)
     return content && typeof content === 'object' && Object.keys(content).length > 0;
 };
 
@@ -15,77 +14,81 @@ export default function BoxSlot({
     onDropVial, 
     onRemoveVial, 
     onDragClear,
-    currentCoords 
+    currentCoords,
+
+    // ⭐ NEW: selection handlers
+    onClickVial,
 }) {
     
-    // ⭐ FIX 1: Add state to track hover for z-index elevation
     const [isHovered, setIsHovered] = useState(false);
 
-    // 1. Setup Drop Hook
-    const [{ isOver, canDrop }, drop] = useDrop(() => ({
-        accept: [ItemTypes.VIAL, ItemTypes.VIAL_BATCH],
-        drop: (item, monitor) => {
-            // Only handle drop if the slot is empty
-            if (!isValidVial(content)) { // Use the robust check here too
-                onDropVial(item, monitor.getItemType());
-                
-                // Return coordinates for the Vial.jsx cleanup logic
-                return { row: currentCoords.rowIndex, col: currentCoords.colIndex };
-            }
-            return undefined;
-        },
-        canDrop: (item, monitor) => !isValidVial(content), // Only allow drop if the slot is empty
-        collect: (monitor) => ({
-            isOver: monitor.isOver(),
-            canDrop: monitor.canDrop(),
+    const [{ isOver, canDrop }, drop] = useDrop(
+        () => ({
+            accept: [ItemTypes.VIAL, ItemTypes.VIAL_BATCH],
+            drop: (item, monitor) => {
+                if (!isValidVial(content)) {
+                    onDropVial(item, monitor.getItemType());
+                    return { row: currentCoords.rowIndex, col: currentCoords.colIndex };
+                }
+                return undefined;
+            },
+            canDrop: () => !isValidVial(content),
+            collect: (monitor) => ({
+                isOver: monitor.isOver(),
+                canDrop: monitor.canDrop(),
+            }),
         }),
-    }), [content, onDropVial]);
+        [content, onDropVial]
+    );
 
-    // 2. Conditional Styling
     const slotStyle = {
         width: '55px',
         height: '55px',
         border: '1px solid #ccc',
-        backgroundColor: '#f1f5f9', // Light gray background
+        backgroundColor: '#f1f5f9',
         position: 'relative',
-        
-        // Use Flexbox to perfectly center the circular Vial
         display: 'flex',
         justifyContent: 'center',
-        alignItems: 'center', 
-        
-        // ⭐ FIX 2: Elevate the zIndex of the entire slot when its content is hovered.
-        // This ensures the Vial's absolute-positioned tooltip floats over adjacent slots.
-        zIndex: isHovered ? 150 : 1, 
-        
-        // Drop highlight
-        boxShadow: isOver && canDrop ? '0 0 5px 3px #3b82f6' : 'none', 
+        alignItems: 'center',
+        zIndex: isHovered ? 150 : 1,
+        boxShadow: isOver && canDrop ? '0 0 5px 3px #3b82f6' : 'none',
         borderColor: isOver && canDrop ? '#3b82f6' : '#ccc',
     };
 
-    const dragRef = drop;
-
-    // Check if the slot should display a vial
     const shouldDisplayVial = isValidVial(content);
 
     return (
-        <div 
-            ref={dragRef} 
-            style={slotStyle} 
+        <div
+            ref={drop}
+            style={slotStyle}
             title={`Slot ${row}${col}`}
-            // ⭐ FIX 3: Add hover handlers to the entire slot
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
             {shouldDisplayVial && (
-                <Vial 
-                    vialData={content} 
-                    isPlaced={true} 
-                    onRemove={() => onRemoveVial(content.id)} 
-                    onDragClear={onDragClear}
-                    currentCoords={currentCoords}
-                />
+                <div
+                    // ⭐ NEW: Capture click for vial selection
+                    onClick={(e) => {
+                        // Do NOT trigger when the X button is clicked
+                        if (e.target.closest('.vial-remove-btn')) return;
+
+                        if (onClickVial) {
+                            onClickVial(e, content);
+                        }
+                        e.stopPropagation();
+                    }}
+                    style={{ width: '100%', height: '100%' }}
+                >
+                    <Vial
+                        vialData={content}
+                        isPlaced={true}
+                        onRemove={() => onRemoveVial(content.id)}
+                        onDragClear={onDragClear}
+                        currentCoords={currentCoords}
+                    />
+                </div>
             )}
+
             {!shouldDisplayVial && isOver && canDrop && (
                 <span style={{ fontSize: '0.6rem', color: '#3b82f6' }}>Drop Here</span>
             )}

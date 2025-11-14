@@ -1,4 +1,4 @@
-// App.jsx (Final Comprehensive Version)
+// App.jsx (Complete — unified selection + unplaced-only vial editing)
 
 import { useState, useCallback } from "react";
 import { DndProvider } from "react-dnd";
@@ -66,8 +66,18 @@ export default function App() {
     slot: 0,
   });
 
-  const [selectedBox, setSelectedBox] = useState(null); 
-  const [editingMode, setEditingMode] = useState(null); 
+  // Keep selectedBox for code paths that expect it (box editing / box contents)
+  // We'll keep it in sync with editingTarget when a box is selected.
+  const [selectedBox, setSelectedBox] = useState(null);
+
+  // Vial selection list (unplaced only). Empty when no vials selected.
+  const [selectedVials, setSelectedVials] = useState([]);
+
+  // Unified editing target:
+  // { type: 'box' | 'vial' | 'vial_multi' | 'vial_batch', data: ... }
+  const [editingTarget, setEditingTarget] = useState(null);
+
+  const [editingMode, setEditingMode] = useState(null); // e.g. 'contents' for box content editor
 
   // States for confirmation dialog 
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -82,37 +92,129 @@ export default function App() {
   
   const onClearSelection = () => {
     setSelectedBox(null);
+    setSelectedVials([]);
+    setEditingTarget(null);
     setEditingMode(null);
     setCurrentBoxLocation({ tower: null, slot: null });
   };
   
-  // ⭐ FIX: Implemented selection logic for both placed and unplaced boxes
+  // Select a box (placed or unplaced) — clears any vial selection
   const onSelectBox = (loc) => {
     let boxData = null;
     
-    // 1. Find the box data based on the location/ID
     if (loc.towerId !== null && loc.slotIndex !== null) {
-      // Placed box: Look in Towers
       const tower = freezerStructure.towers.find(t => t.id === loc.towerId);
       boxData = tower?.slots[loc.slotIndex] || null;
     } else if (loc.boxId) {
-      // Unplaced box: Look in Unplaced List
       boxData = unplacedBoxes.find(box => box.id === loc.boxId) || null;
     }
     
-    // 2. Set selection state
     if (boxData) {
-      console.log("Selected Box Data:", boxData)
+      // normalize selection types and clear vials
+      setSelectedVials([]);
+      setEditingTarget({
+        type: "box",
+        data: boxData,
+        location: { tower: loc.towerId, slot: loc.slotIndex }
+      });
       setSelectedBox({
         type: "box",
         data: boxData,
         location: { tower: loc.towerId, slot: loc.slotIndex }
       });
-      onExitContentEditor(); // Exit editing mode when selecting a new box
+      onExitContentEditor();
       setCurrentBoxLocation({ tower: loc.towerId, slot: loc.slotIndex });
     } else {
-        onClearSelection();
+      onClearSelection();
     }
+  };
+
+  // --- VIAL SELECTION (UNPLACED ONLY) ---
+  // Single click selects one vial (clears box selection)
+  const onSelectVial = (vial) => {
+    setSelectedVials([vial]);
+    setSelectedBox(null);
+    setEditingTarget({
+      type: "vial",
+      data: vial
+    });
+    setEditingMode(null);
+    setCurrentBoxLocation({ tower: null, slot: null });
+  };
+
+  // Shift-click toggles multiselect (unplaced only). Clears box selection.
+  const onSelectVialMulti = (vial) => {
+    setSelectedBox(null);
+    setSelectedVials(prev => {
+      const exists = prev.find(v => v.id === vial.id);
+      const updated = exists ? prev.filter(v => v.id !== vial.id) : [...prev, vial];
+
+      setEditingTarget({
+        type: updated.length === 1 ? "vial" : "vial_multi",
+        data: updated
+      });
+
+      return updated;
+    });
+    setEditingMode(null);
+    setCurrentBoxLocation({ tower: null, slot: null });
+  };
+
+  // Select entire batch (unplaced only)
+  const onSelectBatch = (batchId) => {
+    const vials = unplacedVials.filter(v => v.batchId === batchId);
+    setSelectedVials(vials);
+    setSelectedBox(null);
+
+    setEditingTarget({
+      type: "vial_batch",
+      data: {
+        batchId,
+        vials
+      }
+    });
+
+    setEditingMode(null);
+    setCurrentBoxLocation({ tower: null, slot: null });
+  };
+
+  // Apply metadata edits to selected vials (single / multi / batch)
+  const onUpdateVials = (newMetadata) => {
+    if (!editingTarget) return;
+
+    // Helper: update a single vial by id both in unplacedVials and inside boxes
+    const updateSingleVial = (id, patch) => {
+      // Update unplaced vials
+      setUnplacedVials(prev => prev.map(v => v.id === id ? { ...v, ...patch } : v));
+
+      // Update placed vials (boxes)
+      setFreezerStructure(prev => {
+        const newTowers = prev.towers.map(tower => ({
+          ...tower,
+          slots: tower.slots.map(box => {
+            if (!box) return box;
+            // map contents 2D array
+            const newContents = box.contents.map(row =>
+              row.map(cell => (cell && cell.id === id ? { ...cell, ...patch } : cell))
+            );
+            return { ...box, contents: newContents };
+          })
+        }));
+        return { ...prev, towers: newTowers };
+      });
+    };
+
+    if (editingTarget.type === "vial") {
+      updateSingleVial(editingTarget.data.id, newMetadata);
+    } else if (editingTarget.type === "vial_multi") {
+      editingTarget.data.forEach(vial => updateSingleVial(vial.id, newMetadata));
+    } else if (editingTarget.type === "vial_batch") {
+      editingTarget.data.vials.forEach(vial => updateSingleVial(vial.id, newMetadata));
+    }
+
+    // clear selection after applying edits
+    setSelectedVials([]);
+    setEditingTarget(null);
   };
 
 
@@ -120,7 +222,7 @@ export default function App() {
   
   // Handler for opening the delete confirmation dialog
   const showDeleteConfirm = (box) => { 
-    // Expects selectedBox object: { type, data, location }
+    // Expects an object such as { type: 'box', data: boxObj, location: ... }
     setPendingDeleteItem(box.data); 
     setConfirmDeleteOpen(true);
   };
@@ -130,51 +232,17 @@ export default function App() {
     setPendingDeleteItem(null);
   };
 
-  // ⭐ FIX: Logic for moving a placed box back to the unplaced list
-  const moveToUnplaced = (boxToMove) => { 
-    if (!boxToMove || !boxToMove.towerId) return; // Only move placed boxes
-
-    const boxId = boxToMove.id;
-    const { towerId, slotIndex } = boxToMove;
-
-    // 1. Clear the box from the tower slot in freezerStructure
-    setFreezerStructure(prevStructure => {
-      const newTowers = prevStructure.towers.map(t => ({ ...t, slots: [...t.slots] }));
-      const tower = newTowers.find(t => t.id === towerId);
-
-      if (tower && tower.slots[slotIndex]?.id === boxId) {
-        tower.slots[slotIndex] = null;
-      }
-
-      return { ...prevStructure, towers: newTowers };
-    });
-
-    // 2. Add the box to unplacedBoxes with cleared coordinates
-    const unplacedBox = { 
-        ...boxToMove, 
-        towerId: null, 
-        slotIndex: null 
-    };
-    setUnplacedBoxes(prev => [...prev, unplacedBox]);
-    
-    // 3. Update the selectedBox state and clear location
-    setSelectedBox(prev => prev ? { 
-        ...prev, 
-        data: unplacedBox,
-        location: { tower: null, slot: null }
-    } : null);
-  };
-
-  // ⭐ FIX: Logic executed after confirming deletion
+  // Confirm delete logic (top-level)
   function handleConfirmDelete() {
     if (!pendingDeleteItem) {
       cancelDelete();
       return;
     }
-    
+
     const boxId = pendingDeleteItem.id;
+
     // Flatten contents and filter out nulls to get vials to return
-    const vialsToReturn = pendingDeleteItem.contents.flat().filter(vial => vial !== null);
+    const vialsToReturn = (pendingDeleteItem.contents || []).flat().filter(vial => vial !== null);
 
     // 1. Return Vials to Unplaced List (if any exist)
     if (vialsToReturn.length > 0) {
@@ -207,6 +275,38 @@ export default function App() {
     onClearSelection(); 
   }
 
+  // ⭐ FIX: Logic for moving a placed box back to the unplaced list
+  const moveToUnplaced = (boxToMove) => { 
+    if (!boxToMove || !boxToMove.towerId) return; // Only move placed boxes
+
+    const boxId = boxToMove.id;
+    const { towerId, slotIndex } = boxToMove;
+
+    // 1. Clear the box from the tower slot in freezerStructure
+    setFreezerStructure(prevStructure => {
+      const newTowers = prevStructure.towers.map(t => ({ ...t, slots: [...t.slots] }));
+      const tower = newTowers.find(t => t.id === towerId);
+
+      if (tower && tower.slots[slotIndex]?.id === boxId) {
+        tower.slots[slotIndex] = null;
+      }
+
+      return { ...prevStructure, towers: newTowers };
+    });
+
+    // 2. Add the box to unplacedBoxes with cleared coordinates
+    const unplacedBox = { 
+        ...boxToMove, 
+        towerId: null, 
+        slotIndex: null 
+    };
+    setUnplacedBoxes(prev => [...prev, unplacedBox]);
+    
+    // 3. Update the selectedBox/editingTarget and clear location
+    setSelectedBox({ type: "box", data: unplacedBox, location: { tower: null, slot: null } });
+    setEditingTarget({ type: "box", data: unplacedBox, location: { tower: null, slot: null } });
+  };
+
   // --- TOWER MANAGEMENT FUNCTIONS (Abbreviated) ---
   const onAddTower = (name, capacity) => { /* ... */ };
   const onRenameTower = (towerId, newName) => { /* ... */ };
@@ -220,11 +320,15 @@ export default function App() {
       label,
       dimensions,
       towerId: null,
-      slotIndex: null, // Added for clarity
-      contents: getInitialContents(dimensions), // Use utility function
+      slotIndex: null,
+      contents: getInitialContents(dimensions),
     };
     setUnplacedBoxes((prev) => [...prev, newBox]);
-    setSelectedBox({ type: "Box", data: newBox, location: { tower: null, slot: null } });
+
+    // Select the new box for editing (consistent lowercase 'box')
+    setSelectedBox({ type: "box", data: newBox, location: { tower: null, slot: null } });
+    setEditingTarget({ type: "box", data: newBox, location: { tower: null, slot: null } });
+
     onExitContentEditor();
     setCurrentBoxLocation({ tower: null, slot: null });
   };
@@ -235,15 +339,13 @@ export default function App() {
     const uniqueBatchId = uuidv4(); // Unique batch ID for this batch of vials
     for (let i = 0; i < quantity; i++) {
       const newVial = {
-        // CRITICAL: generate a unique ID for each vial
         id: uuidv4(),
+        batchId: uniqueBatchId,
         ...metadata,
-        // You may want to add a batch number/index here
         batchIndex: i + 1
       };
       newVials.push(newVial);
     }
-    //1. Immediately update the unplacedVialse state
     setUnplacedVials(prevVials => [...prevVials, ...newVials]);
     console.log(`Successfully added ${newVials.length} new vials.`);
   };
@@ -301,11 +403,12 @@ export default function App() {
                 data: newBox, 
                 location: { tower: newBox.towerId, slot: newBox.slotIndex }
             }));
+            setEditingTarget(prev => prev && prev.type === 'box' ? ({ ...prev, data: newBox, location: { tower: newBox.towerId, slot: newBox.slotIndex } }) : prev);
         }
 
         return { ...prevStructure, towers: newTowers };
     });
-  }, [selectedBox]); // Dependencies include selectedBox
+  }, [selectedBox]);
 
   // HANDLER: Saves the contents of the box currently in the editor
   const onSaveBoxContents = (boxId, newContents) => {
@@ -349,6 +452,12 @@ export default function App() {
             contents: newContents 
         } 
     } : null);
+
+    // Also sync editingTarget if it's the same box
+    setEditingTarget(prev => prev && prev.type === 'box' && prev.data.id === boxId
+      ? { ...prev, data: { ...prev.data, contents: newContents } }
+      : prev
+    );
     
     // 4. Exit the editor after saving
     onExitContentEditor();
@@ -405,7 +514,13 @@ export default function App() {
             contents: emptyContents 
         } 
     } : null);
-};
+
+    // sync editingTarget if it referenced the same box
+    setEditingTarget(prev => prev && prev.type === 'box' && prev.data.id === selectedBox.data.id
+      ? { ...prev, data: { ...prev.data, contents: emptyContents } }
+      : prev
+    );
+  };
 
 
   const onEditBoxContents = () => {
@@ -442,10 +557,11 @@ export default function App() {
         >
           {/* 1. TABBED MANAGEMENT FORM (Always Visible) */}
           <TabbedManagementForm
-            editingTarget={selectedBox}
+            editingTarget={editingTarget}
             isEditingContents={isEditingContents}
             onEditBoxContents={onEditBoxContents}
             onSubmit={onUpdateBoxMetadata}
+            onUpdateVials={onUpdateVials}            // NEW: handler for editing vials
             onClearSelection={onClearSelection}
             onAddNewBox={addNewBox}
             onAddNewVial={handleAddNewVial}
@@ -462,11 +578,13 @@ export default function App() {
             <UnplacedList unplacedBoxes={unplacedBoxes} onSelectBox={onSelectBox} />  
           )}
 
-          {/*3. UNPLACED VIALS (Always visible, or visible when editing content)*/}
-          {/* For now, let's show it only when editing contents OR if you want it always visible: */}
+          {/*3. UNPLACED VIALS */}
           <UnplacedVials
             unplacedVials={unplacedVials}
-            style={{ borderTop: '1px solid #ccc', paddingTTop: 10 }}
+            onSelectVial={onSelectVial}
+            onSelectVialMulti={onSelectVialMulti}
+            onSelectBatch={onSelectBatch}
+            style={{ borderTop: '1px solid #ccc', paddingTop: 10 }}
           />
         </div>
 
@@ -499,6 +617,7 @@ export default function App() {
               onVialPlaced={onVialPlaced}
               onVialRemoved={onVialRemoved}
               onClearContents={onClearBoxContents}
+              // NOTE: placed vials are NOT selectable per Option B (do not pass selection handlers)
             />
           )}
         </div>
