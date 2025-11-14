@@ -24,28 +24,62 @@ export default function TabbedManagementForm({
         label: "", 
         dimensions: "9x9" 
     });
-    
+    const [vialFormState, setVialFormState] = useState({
+        label: "",
+        experimentName: "",
+        species: "",
+        cellType: "",
+        freezeDate: "",
+        conc: "",
+        owner: "",
+    });
+
     // Check if a box is actively selected
-    const boxSelected = editingTarget?.data;
+    const isBoxSelected = editingTarget?.type === 'box' && editingTarget.data;
+    const isVialSelected = editingTarget?.type === 'vial' && editingTarget.data;
+    const isVialBatchSelected = editingTarget?.type === 'vial_batch' && editingTarget.data;
+
     
     // --- EFFECTS ---
 
     // Effect to switch tab and load data when a box is selected
     useEffect(() => {
-        if (editingTarget?.data) { 
-            // Switch to the 'edit' tab to show box actions
-            setActiveTab("edit");
-            // Load selected box data into local form state for inline editing
-            setFormState({
-                label: editingTarget.data.label || "",
-                dimensions: editingTarget.data.dimensions || "9x9",
-            });
-        } else if (activeTab === "edit") {
-            // If selection is cleared, return to "add" mode
-            setActiveTab("add");
-            setFormState({ label: "", dimensions: "9x9" });
-        }
-    }, [editingTarget]);
+  if (isBoxSelected) { 
+      setActiveTab("edit");
+      setFormState({
+          label: editingTarget.data.label || "",
+          dimensions: editingTarget.data.dimensions || "9x9"
+      });
+  } else if (isVialSelected) {
+      setActiveTab("vial");
+      setVialFormState({
+        label: editingTarget.data.label || "",
+        experimentName: editingTarget.data.experimentName || "",
+        species: editingTarget.data.species || "",
+        cellType: editingTarget.data.cellType || "",
+        freezeDate: editingTarget.data.freezeDate || "",
+        conc: editingTarget.data.conc || "",
+        owner: editingTarget.data.owner || "",
+      });
+  } else if (isVialBatchSelected) {
+      setActiveTab("vial");
+      setVialFormState(editingTarget.data.vials?.[0] || {}); // first vial as template
+  } else if (activeTab === "edit" || activeTab === "vial") {
+      setActiveTab("add");
+      setFormState({ label: "", dimensions: "9x9" });
+      setVialFormState({
+        label: "",
+        experimentName: "",
+        species: "",
+        cellType: "",
+        freezeDate: "",
+        conc: "",
+        owner: ""
+      });
+  }
+}, [editingTarget]);
+
+
 
     // --- HANDLERS ---
     
@@ -206,7 +240,7 @@ export default function TabbedManagementForm({
                 
                 <button
                     onClick={() => setActiveTab("edit")}
-                    disabled={!boxSelected || isEditingContents} // Disabled when no box selected OR editing contents
+                    disabled={!isBoxSelected || isEditingContents} // Disabled when no box selected OR editing contents
                     style={{ flex: 1, padding: 8, backgroundColor: activeTab === "edit" ? "#2563eb" : "#e0e0e0", color: activeTab === "edit" ? "#fff" : "#000", border: "none", borderRadius: 4, cursor: "pointer" }}
                 >
                     Box Actions
@@ -225,16 +259,25 @@ export default function TabbedManagementForm({
             
             {activeTab === "add" && renderAddBoxForm()}
 
-            {activeTab === "vial" && <VialForm key={vialFormKey}onSubmitVial={handleVialSubmit} />} 
-
+            {activeTab === "vial" && 
+            <VialForm
+             key={vialFormKey}
+             formState={vialFormState}
+             setFormState={setVialFormState}
+             onSubmitVial={handleVialSubmit}
+             isEditing={isVialSelected}
+             onCancelEdit={onClearSelection} 
+             /> 
+            }
             {activeTab === "edit" && (
-                boxSelected ? renderSelectedBoxActions() : (
+                isBoxSelected ? renderSelectedBoxActions() : (
                     <div style={{ textAlign: 'center', padding: '20px 0', color: '#666' }}>
-                        <FaInfoCircle style={{ marginBottom: 5 }} /> <br/>
-                        Select a box to view its actions.
+                    <FaInfoCircle style={{ marginBottom: 5 }} /> <br/>
+                    Select a box to view its actions.
                     </div>
                 )
-            )}
+                )}
+
         </div>
     );
 }

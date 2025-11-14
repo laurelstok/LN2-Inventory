@@ -208,7 +208,9 @@ export default function TowersContainer({
                   slotIndex={i}
                   onDropBox={onDropBox}
                   isSelected={isSelected}
-                  onSelectSlot={onSelectBox}
+                  onSelectSlot={({ tower, slot }) => onSelectBox({
+                    towerId: tower,
+                    slotIndex: slot})}
                 />
               );
             })}

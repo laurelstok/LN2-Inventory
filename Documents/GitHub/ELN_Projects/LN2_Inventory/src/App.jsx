@@ -59,7 +59,7 @@ export default function App() {
   });
 
   const [unplacedBoxes, setUnplacedBoxes] = useState([]);
-  const [unplacedVials, setUnplacedVials] = useState([]); 
+  const [unplacedVials, setUnplacedVials] = useState(INITIAL_UNPLACED_VIALS); 
   
   const [currentBoxLocation, setCurrentBoxLocation] = useState({
     tower: 1,
@@ -69,9 +69,143 @@ export default function App() {
   const [selectedBox, setSelectedBox] = useState(null); 
   const [editingMode, setEditingMode] = useState(null); 
 
-  // States for confirmation dialog (Abbreviated)
+  // States for confirmation dialog 
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [pendingDeleteItem, setPendingDeleteItem] = useState(null);
+
+
+  // --- CORE UI/SELECTION HANDLERS ---
+
+  const onExitContentEditor = () => {
+    setEditingMode(null);
+  };
+  
+  const onClearSelection = () => {
+    setSelectedBox(null);
+    setEditingMode(null);
+    setCurrentBoxLocation({ tower: null, slot: null });
+  };
+  
+  // ⭐ FIX: Implemented selection logic for both placed and unplaced boxes
+  const onSelectBox = (loc) => {
+    let boxData = null;
+    
+    // 1. Find the box data based on the location/ID
+    if (loc.towerId !== null && loc.slotIndex !== null) {
+      // Placed box: Look in Towers
+      const tower = freezerStructure.towers.find(t => t.id === loc.towerId);
+      boxData = tower?.slots[loc.slotIndex] || null;
+    } else if (loc.boxId) {
+      // Unplaced box: Look in Unplaced List
+      boxData = unplacedBoxes.find(box => box.id === loc.boxId) || null;
+    }
+    
+    // 2. Set selection state
+    if (boxData) {
+      console.log("Selected Box Data:", boxData)
+      setSelectedBox({
+        type: "box",
+        data: boxData,
+        location: { tower: loc.towerId, slot: loc.slotIndex }
+      });
+      onExitContentEditor(); // Exit editing mode when selecting a new box
+      setCurrentBoxLocation({ tower: loc.towerId, slot: loc.slotIndex });
+    } else {
+        onClearSelection();
+    }
+  };
+
+
+  // --- DELETE AND MOVE HANDLERS ---
+  
+  // Handler for opening the delete confirmation dialog
+  const showDeleteConfirm = (box) => { 
+    // Expects selectedBox object: { type, data, location }
+    setPendingDeleteItem(box.data); 
+    setConfirmDeleteOpen(true);
+  };
+
+  const cancelDelete = () => { 
+    setConfirmDeleteOpen(false);
+    setPendingDeleteItem(null);
+  };
+
+  // ⭐ FIX: Logic for moving a placed box back to the unplaced list
+  const moveToUnplaced = (boxToMove) => { 
+    if (!boxToMove || !boxToMove.towerId) return; // Only move placed boxes
+
+    const boxId = boxToMove.id;
+    const { towerId, slotIndex } = boxToMove;
+
+    // 1. Clear the box from the tower slot in freezerStructure
+    setFreezerStructure(prevStructure => {
+      const newTowers = prevStructure.towers.map(t => ({ ...t, slots: [...t.slots] }));
+      const tower = newTowers.find(t => t.id === towerId);
+
+      if (tower && tower.slots[slotIndex]?.id === boxId) {
+        tower.slots[slotIndex] = null;
+      }
+
+      return { ...prevStructure, towers: newTowers };
+    });
+
+    // 2. Add the box to unplacedBoxes with cleared coordinates
+    const unplacedBox = { 
+        ...boxToMove, 
+        towerId: null, 
+        slotIndex: null 
+    };
+    setUnplacedBoxes(prev => [...prev, unplacedBox]);
+    
+    // 3. Update the selectedBox state and clear location
+    setSelectedBox(prev => prev ? { 
+        ...prev, 
+        data: unplacedBox,
+        location: { tower: null, slot: null }
+    } : null);
+  };
+
+  // ⭐ FIX: Logic executed after confirming deletion
+  function handleConfirmDelete() {
+    if (!pendingDeleteItem) {
+      cancelDelete();
+      return;
+    }
+    
+    const boxId = pendingDeleteItem.id;
+    // Flatten contents and filter out nulls to get vials to return
+    const vialsToReturn = pendingDeleteItem.contents.flat().filter(vial => vial !== null);
+
+    // 1. Return Vials to Unplaced List (if any exist)
+    if (vialsToReturn.length > 0) {
+        setUnplacedVials(prev => [...prev, ...vialsToReturn]);
+    }
+
+    // 2. Remove the Box from its location
+    if (pendingDeleteItem.towerId) {
+      // Box is PLACED: Remove from Tower
+      const { towerId, slotIndex } = pendingDeleteItem;
+
+      setFreezerStructure(prevStructure => {
+        const newTowers = prevStructure.towers.map(t => ({ ...t, slots: [...t.slots] }));
+        const tower = newTowers.find(t => t.id === towerId);
+
+        if (tower && tower.slots[slotIndex]?.id === boxId) {
+          tower.slots[slotIndex] = null;
+        }
+        return { ...prevStructure, towers: newTowers };
+      });
+    } else {
+      // Box is UNPLACED: Remove from Unplaced List
+      setUnplacedBoxes(prevUnplaced => 
+        prevUnplaced.filter(box => box.id !== boxId)
+      );
+    }
+
+    // 3. Reset states
+    cancelDelete();
+    onClearSelection(); 
+  }
 
   // --- TOWER MANAGEMENT FUNCTIONS (Abbreviated) ---
   const onAddTower = (name, capacity) => { /* ... */ };
@@ -91,7 +225,7 @@ export default function App() {
     };
     setUnplacedBoxes((prev) => [...prev, newBox]);
     setSelectedBox({ type: "Box", data: newBox, location: { tower: null, slot: null } });
-    setEditingMode(null);
+    onExitContentEditor();
     setCurrentBoxLocation({ tower: null, slot: null });
   };
   
@@ -111,13 +245,10 @@ export default function App() {
     }
     //1. Immediately update the unplacedVialse state
     setUnplacedVials(prevVials => [...prevVials, ...newVials]);
-    // 2. Clear the selection if a box was active, forcing a UI refresh
-    // This is optional but can sometimes shake loose rendering issues
-    // onClearSelection();
     console.log(`Successfully added ${newVials.length} new vials.`);
   };
   
-  // ⭐ FINAL FIX: Box movement handler (now handles unplaced-to-tower reliably)
+  // FINAL FIX: Box movement handler (now handles unplaced-to-tower reliably)
   const moveBox = useCallback((source, destination) => {
     
     // 1. If moving from Unplaced List, remove from unplacedBoxes state first.
@@ -176,7 +307,7 @@ export default function App() {
     });
   }, [selectedBox]); // Dependencies include selectedBox
 
-  // ⭐ HANDLER: Saves the contents of the box currently in the editor
+  // HANDLER: Saves the contents of the box currently in the editor
   const onSaveBoxContents = (boxId, newContents) => {
     
     const updateBox = (prevStructure) => {
@@ -220,10 +351,10 @@ export default function App() {
     } : null);
     
     // 4. Exit the editor after saving
-    setEditingMode(null);
+    onExitContentEditor();
   };
   
-  // ⭐ HANDLER: Clears all vials from the box and returns them to unplacedVials
+  // HANDLER: Clears all vials from the box and returns them to unplacedVials
   const onClearBoxContents = (currentContents) => {
     if (!selectedBox) return;
 
@@ -277,25 +408,15 @@ export default function App() {
 };
 
 
-  const showDeleteConfirm = (box) => { /* ... */ };
-  const deleteBox = (boxToDelete) => { /* ... */ };
-  const cancelDelete = () => { /* ... */ };
-  const moveToUnplaced = (boxToMove) => { /* ... */ };
-  const onSelectBox = (loc) => { /* ... */ };
-
   const onEditBoxContents = () => {
     if (selectedBox) {
       setEditingMode('contents');
     }
   };
   
-  const onExitContentEditor = () => {
-    setEditingMode(null);
-  };
 
   const onUpdateBoxMetadata = (formValues, isUpdate) => { /* ... */ };
-  const onClearSelection = () => { /* ... */ };
-  function handleConfirmDelete() { /* ... */ }
+  // function handleConfirmDelete() { /* ... */ } // Logic moved above
 
   const isEditingContents = editingMode === 'contents';
 
@@ -328,8 +449,9 @@ export default function App() {
             onClearSelection={onClearSelection}
             onAddNewBox={addNewBox}
             onAddNewVial={handleAddNewVial}
-            moveToUnplaced={moveToUnplaced}
-            showDeleteConfirm={showDeleteConfirm}
+            // Pass the functions to TabbedManagementForm
+            moveToUnplaced={selectedBox ? () => moveToUnplaced(selectedBox.data) : null}
+            showDeleteConfirm={selectedBox ? () => showDeleteConfirm(selectedBox) : null}
             onAddTower={onAddTower} 
             onRenameTower={onRenameTower}
             onEditTowerCapacity={onEditTowerCapacity}
@@ -383,7 +505,7 @@ export default function App() {
 
         <ConfirmDialog
           open={confirmDeleteOpen}
-          message={`Are you sure you want to delete "${pendingDeleteItem?.label}"?`}
+          message={`Are you sure you want to delete "${pendingDeleteItem?.label}"? This action is permanent and will return all contained vials to the Unplaced Vials list.`}
           onConfirm={handleConfirmDelete}
           onCancel={cancelDelete}
         />
