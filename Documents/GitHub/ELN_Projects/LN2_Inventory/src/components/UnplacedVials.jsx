@@ -26,8 +26,7 @@ const groupVialsByBatch = (vials) => {
 
 export default function UnplacedVials({ 
     unplacedVials,
-
-    // ⭐ NEW selection handlers (coming from App.jsx)
+    editingTarget,             // ⭐ MUST BE PASSED FROM APP
     onSelectVial,
     onSelectVialMulti,
     onSelectBatch 
@@ -45,14 +44,20 @@ export default function UnplacedVials({
     const batchedVials = groupVialsByBatch(unplacedVials);
 
     // =============================
-    // ⭐ BATCH HEADER
+    // BATCH HEADER COMPONENT
     // =============================
     const BatchHeader = ({ batch, isOpen, toggleBatch }) => {
+
+        const isBatchSelected =
+            editingTarget?.type === "batch" &&
+            editingTarget?.data?.length > 0 &&
+            editingTarget.data[0]?.batchId === batch.batchId;
+
         const [{ isDragging }, drag] = useDrag(
             () => ({
                 type: ItemTypes.VIAL_BATCH,
                 item: { batchId: batch.batchId, vials: batch.vials },
-                collect: (monitor) => ({
+                collect: monitor => ({
                     isDragging: monitor.isDragging(),
                 }),
             }),
@@ -64,7 +69,7 @@ export default function UnplacedVials({
                 ref={drag}
                 style={{
                     padding: '8px 10px',
-                    backgroundColor: '#2563eb',
+                    backgroundColor: isBatchSelected ? '#1d4ed8' : '#2563eb',
                     color: 'white',
                     cursor: 'move',
                     fontWeight: 'bold',
@@ -72,14 +77,11 @@ export default function UnplacedVials({
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     opacity: isDragging ? 0.4 : 1,
+                    border: isBatchSelected ? '2px solid #93c5fd' : '2px solid transparent'
                 }}
-
-                // ⭐ NEW — Click batch → select entire batch
                 onClick={(e) => {
-                    // If clicking while dragging, ignore
                     if (isDragging) return;
-
-                    onSelectBatch(batch.batchId);  // FULL batch selection
+                    onSelectBatch(batch.batchId);
                     toggleBatch(batch.batchId);
                     e.stopPropagation();
                 }}
@@ -93,7 +95,7 @@ export default function UnplacedVials({
     };
 
     // =============================
-    // ⭐ MAIN RENDER
+    // MAIN RENDER
     // =============================
     return (
         <div style={{ border: '1px solid #ccc', padding: 15, borderRadius: 8, maxHeight: 400, overflowY: 'auto' }}>
@@ -108,42 +110,57 @@ export default function UnplacedVials({
 
                         return (
                             <div 
-                                key={batch.batchId} 
-                                style={{ border: '1px solid #ddd', borderRadius: 4, overflow: 'hidden' }}
+                                key={batch.batchId}
+                                style={{
+                                    border: '1px solid #ddd',
+                                    borderRadius: 4,
+                                    overflow: 'hidden'
+                                }}
                             >
                                 <BatchHeader 
-                                    batch={batch} 
-                                    isOpen={isOpen} 
-                                    toggleBatch={toggleBatch} 
+                                    batch={batch}
+                                    isOpen={isOpen}
+                                    toggleBatch={toggleBatch}
                                 />
 
                                 {isOpen && (
                                     <div style={{ padding: 5, backgroundColor: '#fff' }}>
-                                        {batch.vials.map(vial => (
-                                            <div
-                                                key={vial.id}
+                                        {batch.vials.map(vial => {
 
-                                                // ⭐ NEW — vial click selection
-                                                onClick={(e) => {
-                                                    if (e.shiftKey) {
-                                                        onSelectVialMulti(vial);   // Add/remove from multi-select
-                                                    } else {
-                                                        onSelectVial(vial);        // Single selection
-                                                    }
-                                                    e.stopPropagation();
-                                                }}
+                                            // compute whether this vial is selected
+                                            const isSelected =
+                                                (editingTarget?.type === "vial" && editingTarget.data.id === vial.id) ||
+                                                (editingTarget?.type === "vial_multi" && editingTarget.data.some(v => v.id === vial.id)) ||
+                                                (editingTarget?.type === "batch" && editingTarget.data.some(v => v.id === vial.id));
 
-                                                // ⭐ Keep drag and click separate:
-                                                style={{
-                                                    cursor: 'pointer',
-                                                    padding: 4,
-                                                    borderRadius: 4,
-                                                    marginBottom: 3,
-                                                }}
-                                            >
-                                                <Vial vialData={vial} />
-                                            </div>
-                                        ))}
+                                            return (
+                                                <div
+                                                    key={vial.id}
+                                                    onClick={(e) => {
+                                                        if (e.shiftKey){
+                                                            onSelectVialMulti(vial);
+                                                        } else {
+                                                            onSelectVial(vial);
+                                                        }
+                                                        e.stopPropagation();
+                                                    }}
+                                                    style={{
+                                                        cursor: 'pointer',
+                                                        padding: 4,
+                                                        borderRadius: 4,
+                                                        marginBottom: 3,
+                                                        background: isSelected
+                                                            ? 'rgba(0, 150, 255, 0.25)'
+                                                            : 'transparent',
+                                                        border: isSelected
+                                                            ? '1px solid #0096ff'
+                                                            : '1px solid transparent'
+                                                    }}
+                                                >
+                                                    <Vial vialData={vial} />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

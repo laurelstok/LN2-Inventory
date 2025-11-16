@@ -44,10 +44,10 @@ const INITIAL_UNPLACED_VIALS = (() => {
     const batchId1 = uuidv4();
     const batchId2 = uuidv4();
     return [
-        { id: uuidv4(), batchId: batchId1, label: "DE-LS01-1", experimentName: "DE-LS01", cellType: "DE", species: "Human", conc: "1e6 cells/mL", freezeDate: "2025-10-25", owner: "Jane Doe" },
-        { id: uuidv4(), batchId: batchId1, label: "DE-LS01-2", experimentName: "DE-LS01", cellType: "DE", species: "Human", conc: "1e6 cells/mL", freezeDate: "2025-10-25", owner: "Jane Doe" },
-        { id: uuidv4(), batchId: batchId2, label: "Mouse PBMC-1", experimentName: "Mouse PBMC TEST", cellType: "PBMC", species: "Mouse", conc: "1e6 cells/mL", freezeDate: "2025-10-24", owner: "John Smith" },
-        { id: uuidv4(), batchId: batchId2, label: "Mouse PBMC-2", experimentName: "Mouse PBMC TEST", cellType: "PBMC", species: "Mouse", conc: "1e6 cells/mL", freezeDate: "2025-10-24", owner: "John Smith" },
+        { id: uuidv4(), batchId: batchId1, label: "DE-LS01-1", experimentName: "DE-LS01", cellType: "DE", passage: "7", conc: "1e6 cells/mL", freezeDate: "2025-10-25", owner: "Jane Doe" },
+        { id: uuidv4(), batchId: batchId1, label: "DE-LS01-2", experimentName: "DE-LS01", cellType: "DE", passage: "7", conc: "1e6 cells/mL", freezeDate: "2025-10-25", owner: "Jane Doe" },
+        { id: uuidv4(), batchId: batchId2, label: "Mouse PBMC-1", experimentName: "Mouse PBMC TEST", cellType: "PBMC", passage: "5", conc: "1e6 cells/mL", freezeDate: "2025-10-24", owner: "John Smith" },
+        { id: uuidv4(), batchId: batchId2, label: "Mouse PBMC-2", experimentName: "Mouse PBMC TEST", cellType: "PBMC", passage: "5", conc: "1e6 cells/mL", freezeDate: "2025-10-24", owner: "John Smith" },
     ];
 })();
 
@@ -133,18 +133,15 @@ export default function App() {
   // Single click selects one vial (clears box selection)
   const onSelectVial = (vial) => {
     setSelectedVials([vial]);
-    setSelectedBox(null);
     setEditingTarget({
       type: "vial",
       data: vial
     });
-    setEditingMode(null);
     setCurrentBoxLocation({ tower: null, slot: null });
   };
 
   // Shift-click toggles multiselect (unplaced only). Clears box selection.
   const onSelectVialMulti = (vial) => {
-    setSelectedBox(null);
     setSelectedVials(prev => {
       const exists = prev.find(v => v.id === vial.id);
       const updated = exists ? prev.filter(v => v.id !== vial.id) : [...prev, vial];
@@ -156,7 +153,6 @@ export default function App() {
 
       return updated;
     });
-    setEditingMode(null);
     setCurrentBoxLocation({ tower: null, slot: null });
   };
 
@@ -164,7 +160,6 @@ export default function App() {
   const onSelectBatch = (batchId) => {
     const vials = unplacedVials.filter(v => v.batchId === batchId);
     setSelectedVials(vials);
-    setSelectedBox(null);
 
     setEditingTarget({
       type: "vial_batch",
@@ -174,7 +169,6 @@ export default function App() {
       }
     });
 
-    setEditingMode(null);
     setCurrentBoxLocation({ tower: null, slot: null });
   };
 
@@ -581,6 +575,7 @@ export default function App() {
           {/*3. UNPLACED VIALS */}
           <UnplacedVials
             unplacedVials={unplacedVials}
+            editingTarget={editingTarget}
             onSelectVial={onSelectVial}
             onSelectVialMulti={onSelectVialMulti}
             onSelectBatch={onSelectBatch}
@@ -611,6 +606,7 @@ export default function App() {
           {isEditingContents && selectedBox?.data && (
             <BoxContentsEditor 
               box={selectedBox.data} 
+              isEditingContents={isEditingContents}
               unplacedVials={unplacedVials}
               onExit={onExitContentEditor}
               onSaveContents={onSaveBoxContents} 

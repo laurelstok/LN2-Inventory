@@ -2,13 +2,12 @@ import React from "react";
 import { FaPlus, FaTimes } from 'react-icons/fa';
 
 const CELL_TYPES = ["DC", "DE", "HSC", "iPSC", "NK", "PBMC", "T-Cells"];
-const SPECIES_TYPES = ["Human", "Mouse", "Other"];
 const CONC_OPTIONS = ["1e7", "1e6", "5e5", "Other"];
 
 const initialVialState = {
   experimentName: "",
   cellType: CELL_TYPES[0],
-  species: SPECIES_TYPES[0],
+  passage: 0,
   conc: CONC_OPTIONS[0],
   freezeDate: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
   owner: "",
@@ -43,10 +42,9 @@ export default function VialForm({ formState, setFormState, onSubmitVial, isEdit
         </select>
       </label>
 
-      <label>Species:
-        <select name="species" value={formState.species} onChange={handleChange}>
-          {SPECIES_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
-        </select>
+      <label>Passage Number:
+        <input type="number" name="passage" value={formState.passage} onChange={handleChange}>
+        </input>
       </label>
 
       <label>Conc:

@@ -153,7 +153,7 @@ export default function BoxContentsEditor({
             
             <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: `auto repeat(${cols}, 55px)`, 
+                gridTemplateColumns: `auto repeat(${cols}, 70px)`, 
                 gap: 2, 
                 maxWidth: 'fit-content',
                 margin: '10px 0',

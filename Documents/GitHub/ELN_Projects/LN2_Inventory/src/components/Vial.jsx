@@ -94,6 +94,7 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
     fontWeight: 'bold',
     position: 'relative', 
     boxShadow: 'none', 
+    textAlign: "center"
   };
   
   const dragRef = drag;
@@ -111,7 +112,8 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
         <>
             {/* Use optional chaining everywhere for stability */}
             {/* Show only a small identifier when placed */}
-            {vialData?.experimentName ? vialData.experimentName.substring(0, 3).toUpperCase() : 'V'}
+            {vialData?.experimentName || 'V'}
+
             
             {/* CONDITIONAL TOOLTIP RENDER */}
             {isHovered && (
@@ -121,9 +123,9 @@ export default function Vial({ vialData, isPlaced = false, onRemove, onDragClear
                     </p>
                     <hr style={{ margin: '4px 0', borderColor: '#475569' }}/>
                     
-                    {/* Species and Cell Type */}
+                    {/* Passage and Cell Type */}
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
-                        **Species:** {vialData?.species || 'N/A'}
+                        **Passage:** {vialData?.passage || 'N/A'}
                     </p>
                     <p style={{ margin: '2px 0 0 0', fontSize: '0.75rem' }}>
                         **Cell Type:** {vialData?.cellType || 'N/A'}
