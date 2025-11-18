@@ -21,7 +21,7 @@ export default function TabbedManagementForm({
   const [vialFormState, setVialFormState] = useState({
     label: "",
     experimentName: "",
-    species: "",
+    passageNumber: "",
     cellType: "",
     freezeDate: "",
     conc: "",
@@ -62,7 +62,7 @@ export default function TabbedManagementForm({
       setVialFormState({
         label: "",
         experimentName: "",
-        species: "",
+        passageNumber: "",
         cellType: "",
         freezeDate: "",
         conc: "",
