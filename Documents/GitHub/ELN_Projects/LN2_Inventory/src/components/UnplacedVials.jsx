@@ -9,20 +9,24 @@ const ItemTypes = { VIAL: 'vial', VIAL_BATCH: 'vial_batch' };
 
 // Group vials by batchId
 const groupVialsByBatch = (vials) => {
-    const batches = {};
-    vials.forEach(vial => {
-        const batchId = vial.batchId || 'unbatched';
-        if (!batches[batchId]) {
-            batches[batchId] = {
-                header: vial.experimentName || 'Unnamed Batch',
-                vials: [],
-                batchId,
-            };
-        }
-        batches[batchId].vials.push(vial);
-    });
-    return Object.values(batches);
+  const batches = {};
+  vials.forEach(vial => {
+    const batchId = vial.batchId || 'unbatched';
+    if (!batches[batchId]) {
+      batches[batchId] = {
+        header: vial.experimentName || 'Unnamed Batch',
+        vials: [],
+        batchId,
+      };
+    }
+    // only add if id not already present
+    if (!batches[batchId].vials.find(v => v.id === vial.id)) {
+      batches[batchId].vials.push(vial);
+    }
+  });
+  return Object.values(batches);
 };
+
 
 export default function UnplacedVials({ 
     unplacedVials,
@@ -49,9 +53,8 @@ export default function UnplacedVials({
     const BatchHeader = ({ batch, isOpen, toggleBatch }) => {
 
         const isBatchSelected =
-            editingTarget?.type === "batch" &&
-            editingTarget?.data?.length > 0 &&
-            editingTarget.data[0]?.batchId === batch.batchId;
+            editingTarget?.type === "vial_batch" &&
+            editingTarget?.data?.batchId === batch.batchId;
 
         const [{ isDragging }, drag] = useDrag(
             () => ({
@@ -97,6 +100,7 @@ export default function UnplacedVials({
     // =============================
     // MAIN RENDER
     // =============================
+    console.log("UNPLACED VIALS", unplacedVials);
     return (
         <div style={{ border: '1px solid #ccc', padding: 15, borderRadius: 8, maxHeight: 400, overflowY: 'auto' }}>
             
@@ -130,8 +134,9 @@ export default function UnplacedVials({
                                             // compute whether this vial is selected
                                             const isSelected =
                                                 (editingTarget?.type === "vial" && editingTarget.data.id === vial.id) ||
-                                                (editingTarget?.type === "vial_multi" && editingTarget.data.some(v => v.id === vial.id)) ||
-                                                (editingTarget?.type === "batch" && editingTarget.data.some(v => v.id === vial.id));
+                                                (editingTarget?.type === "vial_multi" && Array.isArray(editingTarget.data) && editingTarget.data.some(v => v.id === vial.id)) ||
+                                                (editingTarget?.type === "vial_batch" && Array.isArray(editingTarget.data?.vials) && editingTarget.data.vials.some(v => v.id === vial.id));
+
 
                                             return (
                                                 <div
