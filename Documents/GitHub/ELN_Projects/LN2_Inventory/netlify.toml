@@ -1,0 +1,13 @@
+[build]
+  # CONFIRMED BASE DIRECTORY: We are using the name you confirmed. 
+  # This tells Netlify to navigate into this folder before running the build command.
+  base = "LN2_Inventory" 
+
+  # The command to execute the build script defined in package.json
+  # This runs inside the 'LN2_Inventory' directory.
+  command = "npm run build"
+
+  # CRITICAL PATH FIX: The Publish directory is where the final, compiled code (the 'dist' folder) 
+  # is located. We must specify the path RELATIVE TO THE REPOSITORY ROOT for safety.
+  # This combines the base directory with the output directory.
+  publish = "LN2_Inventory/dist"
